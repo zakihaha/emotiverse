@@ -2,7 +2,7 @@ import { UserSelectionCard } from "@/components/user-selection-card"
 import { UserAPI } from "@/lib/mock-data"
 
 export default async function Home() {
-  const response = await fetch("http://localhost:4000/api/users")
+  const response = await fetch("https://dummyjson.com/c/a9eb-5498-461a-bcfe")
   const users = await response.json()
 
   return (
