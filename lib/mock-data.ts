@@ -28,3 +28,24 @@ export interface MessageAPI {
   }[]
   createdAt: Date
 }
+
+export interface MessageResponseWebsocket {
+  success: boolean
+  messageId: string
+  content: string
+  senderId: string
+  status: "sent" | "delivered" | "read" | "undelivered"
+  createdAt: Date
+}
+
+export interface MessageReadReceipt {
+  messageId: string
+  userId: string
+}
+
+export interface UserGroupAPI {
+  id: string
+  username: string
+  email: string
+  avatar: string
+}

@@ -15,7 +15,7 @@ export default function SelectGroupPage() {
   const router = useRouter()
   const userId = searchParams.get("userId")
 
-  const [userName, setUserName] = useState("")
+  // const [userName, setUserName] = useState("")
   const [joinedGroups, setJoinedGroups] = useState<GroupAPI[]>([])
   const [availableGroups, setAvailableGroups] = useState<GroupAPI[]>([])
 
@@ -33,7 +33,7 @@ export default function SelectGroupPage() {
       return
     }
 
-    setUserName(user.username)
+    // setUserName(user.username)
   }
 
   const getMyGroups = async () => {

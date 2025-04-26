@@ -3,10 +3,12 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { getSocket } from '@/lib/socket';
 import { getCookie } from 'cookies-next';
+import { Socket } from 'socket.io-client';
 
-const SocketContext = createContext();
+type SocketContextValue = Socket | null;
+const SocketContext = createContext<SocketContextValue>(null);
 
-export const useSocket = () => useContext(SocketContext);
+export const useSocket = () => useContext(SocketContext) as Socket;
 
 export default function SocketProvider({ children }: { children: React.ReactNode }) {
     const [socket, setSocket] = useState(null);

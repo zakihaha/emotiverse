@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Send, Check, CheckCheck, Users } from "lucide-react"
-import type { GroupAPI, MessageAPI, UserAPI } from "@/lib/mock-data"
+import type { MessageAPI, MessageReadReceipt, MessageResponseWebsocket, UserAPI, UserGroupAPI } from "@/lib/mock-data"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatDate } from "@/lib/utils"
@@ -27,12 +27,12 @@ export default function ChatPage() {
 
   const [chatName, setChatName] = useState("")
   const [chatAvatar, setChatAvatar] = useState("")
-  const [chatMembers, setChatMembers] = useState<any[]>([])
+  const [chatMembers, setChatMembers] = useState<UserGroupAPI[]>([])
 
   const [friend, setFriend] = useState<UserAPI>({} as UserAPI)
   const [chatHistory, setChatHistory] = useState<MessageAPI[]>([])
 
-  const [group, setGroup] = useState<GroupAPI>({} as any)
+  // const [group, setGroup] = useState<GroupAPI>({} as any)
 
   const [content, setContent] = useState("")
 
@@ -89,7 +89,7 @@ export default function ChatPage() {
       router.push("/")
       return
     }
-    setGroup(group)
+    // setGroup(group)
     setChatName(group.name)
     setChatAvatar(group.avatar)
     setChatMembers(group.members)
@@ -116,7 +116,7 @@ export default function ChatPage() {
         setChatHistory((prev) => [...prev, msg]);
       }
 
-      socket.emit('read_receipt', { messageId: msg._id, userId }, (res) => {
+      socket.emit('read_receipt', { messageId: msg._id, userId }, (res: MessageReadReceipt) => {
         console.log('✅ Message read:', res);
       })
     });
@@ -146,7 +146,7 @@ export default function ChatPage() {
     // if (!content || !friend._id) return;
 
     if (socket) {
-      socket.emit('send_message', { senderId: userId, toUserId: friendId, groupId: groupId, content }, (res: any) => {
+      socket.emit('send_message', { senderId: userId, toUserId: friendId, groupId: groupId, content }, (res: MessageResponseWebsocket) => {
         if (res.success) {
           const newMsg: MessageAPI = {
             _id: res.messageId,
@@ -253,18 +253,18 @@ export default function ChatPage() {
                     <div className="flex -space-x-2 mt-1">
                       <TooltipProvider>
                         {message.readBy.map((userId, idx) => {
-                          const reader = chatMembers.find((m) => m.id === userId)
-                          if (!reader || reader.id === userId) return null
+                          const reader = chatMembers.find((m) => m.id === userId.userId)
+                          if (!reader || reader.id === userId.userId) return null
                           return (
                             <Tooltip key={idx}>
                               <TooltipTrigger asChild>
                                 <Avatar className="h-5 w-5 border-2 border-white">
-                                  <AvatarImage src={reader.avatar || "/placeholder.svg"} alt={reader.name} />
-                                  <AvatarFallback>{reader.name.charAt(0)}</AvatarFallback>
+                                  <AvatarImage src={reader.avatar || "/placeholder.svg"} alt={reader.username} />
+                                  <AvatarFallback>{reader.username.charAt(0)}</AvatarFallback>
                                 </Avatar>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Read by {reader.name}</p>
+                                <p>Read by {reader.username}</p>
                               </TooltipContent>
                             </Tooltip>
                           )
