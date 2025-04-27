@@ -7,17 +7,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Users } from "lucide-react"
-import { GroupAPI } from "@/lib/mock-data"
+import { Group } from "@/lib/types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Socket } from "socket.io-client"
+import { useSocket } from "@/providers/SocketProvider"
 
 export default function SelectGroupPage() {
+  const socket: Socket = useSocket();
+
   const searchParams = useSearchParams()
   const router = useRouter()
   const userId = searchParams.get("userId")
 
-  // const [userName, setUserName] = useState("")
-  const [joinedGroups, setJoinedGroups] = useState<GroupAPI[]>([])
-  const [availableGroups, setAvailableGroups] = useState<GroupAPI[]>([])
+  const [joinedGroups, setJoinedGroups] = useState<Group[]>([])
+  const [availableGroups, setAvailableGroups] = useState<Group[]>([])
 
   const getUser = async () => {
     if (!userId) {
@@ -25,19 +28,27 @@ export default function SelectGroupPage() {
       return
     }
 
-    const response = await fetch(`http://localhost:4000/api/users/${userId}`)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${userId}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
     const user = await response.json()
 
     if (!user) {
       router.push("/")
       return
     }
-
-    // setUserName(user.username)
   }
 
   const getMyGroups = async () => {
-    const response = await fetch(`http://localhost:4000/api/users/${userId}/groups`)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${userId}/groups`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
     const myGroups = await response.json()
 
     setJoinedGroups(myGroups)
@@ -49,22 +60,35 @@ export default function SelectGroupPage() {
       return
     }
 
-    const response = await fetch(`http://localhost:4000/api/available-groups/${userId}`)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/available-groups/${userId}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
     const availableGroups = await response.json()
-
     setAvailableGroups(availableGroups)
   }
 
+  const handleSelectGroup = (groupId: string) => {
+    router.push(`/dashboard/chat?userId=${userId}&groupId=${groupId}&type=group`)
+  }
+
+  const handleJoinGroup = async (groupId: string) => {
+    if (socket) {
+      socket.emit("join_group", { userId, groupId }, (res: any) => {
+        if (res.success) {
+          router.push(`/dashboard/chat?userId=${userId}&groupId=${groupId}&type=group`)
+        }
+      })
+    }
+  }
 
   useEffect(() => {
     getUser()
     getMyGroups()
     getAvailableGroups()
   }, [userId, router])
-
-  const handleSelectGroup = (groupId: string) => {
-    router.push(`/dashboard/chat?userId=${userId}&groupId=${groupId}&type=group`)
-  }
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-rose-50 to-indigo-50 p-4">
@@ -138,7 +162,7 @@ export default function SelectGroupPage() {
                   <Card
                     key={group._id}
                     className="overflow-hidden transition-all duration-300 hover:shadow-lg cursor-pointer py-0"
-                    onClick={() => handleSelectGroup(group._id)}
+                    onClick={() => handleJoinGroup(group._id)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center space-x-4">

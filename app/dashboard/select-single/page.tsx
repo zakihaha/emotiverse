@@ -7,14 +7,14 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import { UserAPI } from "@/lib/mock-data"
+import { User } from "@/lib/types"
 
 export default function SelectSinglePage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const userId = searchParams.get("userId")
 
-  const [friends, setFriends] = useState<UserAPI[]>([])
+  const [friends, setFriends] = useState<User[]>([])
 
   const getFriends = async () => {
     if (!userId) {
@@ -22,7 +22,7 @@ export default function SelectSinglePage() {
       return
     }
 
-    const response = await fetch(`http://localhost:4000/api/users?except=${userId}`)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users?except=${userId}`)
     const friends = await response.json()
 
     if (!friends) {

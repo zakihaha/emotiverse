@@ -1,6 +1,6 @@
 "use client"
 
-import type { UserAPI } from "@/lib/mock-data"
+import type { User } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -8,14 +8,14 @@ import { useRouter } from "next/navigation"
 import { setCookie } from 'cookies-next';
 
 interface UserSelectionCardProps {
-  user: UserAPI
+  user: User
 }
 
 export function UserSelectionCard({ user }: UserSelectionCardProps) {
   const router = useRouter()
 
   const handleSelectUser = async () => {
-    const response = await fetch(`http://localhost:4000/api/login`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -29,6 +29,7 @@ export function UserSelectionCard({ user }: UserSelectionCardProps) {
       return
     }
 
+    localStorage.setItem("token", data.token)
     setCookie('token', data.token, {
       maxAge: 60 * 60 * 24, // Set the cookie to expire in 1 day
       path: '/',            // Available throughout the site

@@ -7,9 +7,8 @@ import { useEffect, useRef, useState } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Send, Check, CheckCheck, Users } from "lucide-react"
-import type { MessageAPI, MessageReadReceipt, MessageResponseWebsocket, UserAPI, UserGroupAPI } from "@/lib/mock-data"
-import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, Send, Check, CheckCheck } from "lucide-react"
+import type { Message, MessageReadReceipt, MessageResponseWebsocket, User, UserGroup } from "@/lib/types"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatDate } from "@/lib/utils"
 import { Socket } from "socket.io-client"
@@ -20,19 +19,17 @@ export default function ChatPage() {
 
   const searchParams = useSearchParams()
   const router = useRouter()
-  const userId = searchParams.get("userId")
+  const userId = searchParams.get("userId") || ""
   const friendId = searchParams.get("friendId")
   const groupId = searchParams.get("groupId")
   const chatType = searchParams.get("type")
 
   const [chatName, setChatName] = useState("")
   const [chatAvatar, setChatAvatar] = useState("")
-  const [chatMembers, setChatMembers] = useState<UserGroupAPI[]>([])
+  const [chatMembers, setChatMembers] = useState<UserGroup[]>([])
 
-  const [friend, setFriend] = useState<UserAPI>({} as UserAPI)
-  const [chatHistory, setChatHistory] = useState<MessageAPI[]>([])
-
-  // const [group, setGroup] = useState<GroupAPI>({} as any)
+  const [friend, setFriend] = useState<User>({} as User)
+  const [chatHistory, setChatHistory] = useState<Message[]>([])
 
   const [content, setContent] = useState("")
 
@@ -44,14 +41,18 @@ export default function ChatPage() {
       return
     }
 
-    const response = await fetch(`http://localhost:4000/api/users/${friendId}`)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${friendId}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
     const friend = await response.json()
 
     if (!friend) {
       router.push("/")
       return
     }
-    console.log(friend);
 
     setFriend(friend)
     setChatName(friend.username)
@@ -64,15 +65,21 @@ export default function ChatPage() {
       return
     }
 
-    let url = `http://localhost:4000/api/chat/${userId}/${friendId}`
+    let url = `${process.env.NEXT_PUBLIC_API_URL}/chat/${userId}/${friendId}`
 
     if (chatType === "group") {
-      url = `http://localhost:4000/api/groups/${groupId}/chat`
+      url = `${process.env.NEXT_PUBLIC_API_URL}/groups/${groupId}/chat`
     }
 
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
     const chatHistory = await response.json()
-    console.log(chatHistory);
+
+    console.log("📂 Getting history chat from API");
 
     setChatHistory(chatHistory)
   }
@@ -83,13 +90,18 @@ export default function ChatPage() {
       return
     }
 
-    const response = await fetch(`http://localhost:4000/api/groups/${groupId}`)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/groups/${groupId}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
     const group = await response.json()
     if (!group) {
       router.push("/")
       return
     }
-    // setGroup(group)
+
     setChatName(group.name)
     setChatAvatar(group.avatar)
     setChatMembers(group.members)
@@ -110,19 +122,24 @@ export default function ChatPage() {
     if (!socket) return;
 
     socket.on('receive_message', (msg) => {
-      console.log(`Receiving message:`, msg);
+      console.log(`🎉 Receiving message:`, msg);
 
       if (msg.senderId !== userId) {
-        setChatHistory((prev) => [...prev, msg]);
-      }
+        const validGroupChat = chatType === "group" && msg.receiverId === null && msg.groupId === groupId
+        const validSingleChat = chatType === "single" && msg.groupId === null && msg.senderId === friendId
 
-      socket.emit('read_receipt', { messageId: msg._id, userId }, (res: MessageReadReceipt) => {
-        console.log('✅ Message read:', res);
-      })
+        if (validGroupChat || validSingleChat) {
+          setChatHistory((prev) => [...prev, msg]);
+
+          socket.emit('read_receipt', { messageId: msg._id, userId }, (res: MessageReadReceipt) => {
+            console.log('✅ Message read:', res);
+          })
+        }
+      }
     });
 
     socket.on('message_status_updated', (msg) => {
-      console.log(`Message status updated:`, msg);
+      console.log(`🍀 Message status updated:`, msg);
 
       setChatHistory((prev) => {
         const updatedMessages = prev.map((message) => {
@@ -135,25 +152,41 @@ export default function ChatPage() {
       })
     });
 
+    socket.on('user_joined', (msg) => {
+      console.log(`🙋🏻‍♂️ User joined:`, msg);
+      setChatMembers((prev) => [...prev, msg.user]);
+    });
+
+    socket.on('user_left', (msg) => {
+      console.log(`🫤 User left:`, msg);
+      setChatMembers((prev) => prev.filter((member) => member._id !== msg.userId));
+    });
+
     return () => {
       socket.off('receive_message');
       socket.off('message_status_updated');
+      socket.off('user_joined');
+      socket.off('user_left');
     };
   }, [socket]);
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    // if (!content || !friend._id) return;
 
     if (socket) {
       socket.emit('send_message', { senderId: userId, toUserId: friendId, groupId: groupId, content }, (res: MessageResponseWebsocket) => {
         if (res.success) {
-          const newMsg: MessageAPI = {
+          const newMsg: Message = {
             _id: res.messageId,
             content: res.content,
             senderId: res.senderId,
             status: res.status,
             createdAt: new Date(res.createdAt),
+            sender: {
+              _id: userId,
+              username: chatName,
+              avatar: chatAvatar,
+            }
           }
           setChatHistory((prev) => [...prev, newMsg]);
           setContent('');
@@ -161,18 +194,6 @@ export default function ChatPage() {
       });
     }
   };
-
-  const getMessageSender = (senderId: string) => {
-    if (senderId === userId) {
-      return "You"
-    }
-
-    if (chatType === "single") {
-      return "Unknown"
-    } else {
-      return "Unknown"
-    }
-  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -187,6 +208,17 @@ export default function ChatPage() {
     }
   }
 
+  const leaveGroup = () => {
+    if (socket) {
+      socket.emit("leave_group", { userId, groupId }, (res: any) => {
+        if (res.success) {
+          console.log("✋🏻 Leaving group");
+          router.push(`/dashboard/select-group?userId=${userId}`)
+        }
+      })
+    }
+  }
+
   useEffect(() => {
     // Scroll to bottom when messages change
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -195,31 +227,42 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-rose-50 to-indigo-50">
       {/* Chat Header */}
-      <div className="flex items-center p-4 border-b bg-white shadow-sm">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() =>
-            router.push(chatType === "single" ? `/dashboard/select-single?userId=${userId}` : `/dashboard/select-group?userId=${userId}`)
-          }
-          className="mr-2"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <Avatar className="h-10 w-10 mr-3">
-          <AvatarImage src={chatAvatar} alt={chatName} />
-        </Avatar>
-        <div className="flex-1">
+      <div className="p-4 border-b bg-white shadow-sm">
+        <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <h2 className="font-semibold">{chatName}</h2>
-            {chatType === "group" && (
-              <Badge className="ml-2 bg-indigo-500">
-                <Users className="h-3 w-3 mr-1" />
-                {chatMembers.length}
-              </Badge>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() =>
+                router.push(chatType === "single" ? `/dashboard/select-single?userId=${userId}` : `/dashboard/select-group?userId=${userId}`)
+              }
+              className="mr-2"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Avatar className="h-10 w-10 mr-3">
+              <AvatarImage src={chatAvatar} alt={chatName} />
+            </Avatar>
+            <div className="flex-1">
+              <div className="flex items-center">
+                <h2 className="font-semibold">{chatName}</h2>
+              </div>
+              {chatType === "group" && <p className="text-xs text-gray-500">{`${chatMembers.length} members`}</p>}
+            </div>
           </div>
-          <p className="text-xs text-gray-500">{chatType === "single" ? "Online" : `${chatMembers.length} members`}</p>
+          <div>
+            {
+              chatType === "group" && (
+                <Button
+                  variant={"destructive"}
+                  size="sm"
+                  onClick={leaveGroup}
+                >
+                  Leave
+                </Button>
+              )
+            }
+          </div>
         </div>
       </div>
 
@@ -230,13 +273,13 @@ export default function ChatPage() {
           return (
             <div key={message._id} className={`mb-4 ${isCurrentUser ? "text-right flex justify-end" : "text-left"}`}>
               {!isCurrentUser && chatType === "group" && (
-                <p className="text-xs text-gray-500 mb-1">{getMessageSender(message.senderId)}</p>
+                <p className="text-xs text-gray-500 mb-1">{message.sender.username}</p>
               )}
               <div className="gap-2">
                 {!isCurrentUser && chatType === "group" && (
                   <Avatar className="h-8 w-8">
                     <AvatarImage
-                      src={friend.avatar}
+                      src={message.sender.avatar}
                       alt={friend.username}
                     />
                   </Avatar>
@@ -253,8 +296,8 @@ export default function ChatPage() {
                     <div className="flex -space-x-2 mt-1">
                       <TooltipProvider>
                         {message.readBy.map((userId, idx) => {
-                          const reader = chatMembers.find((m) => m.id === userId.userId)
-                          if (!reader || reader.id === userId.userId) return null
+                          const reader = chatMembers.find((m) => m._id === userId.userId)
+                          if (!reader || reader._id === userId.userId) return null
                           return (
                             <Tooltip key={idx}>
                               <TooltipTrigger asChild>

@@ -1,8 +1,8 @@
 import { UserSelectionCard } from "@/components/user-selection-card"
-import { UserAPI } from "@/lib/mock-data"
+import { User } from "@/lib/types"
 
 export default async function Home() {
-  const response = await fetch("https://dummyjson.com/c/a9eb-5498-461a-bcfe")
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`)
   const users = await response.json()
 
   return (
@@ -16,7 +16,7 @@ export default async function Home() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {users.map((user: UserAPI, idx: number) => (
+          {users.map((user: User, idx: number) => (
             <UserSelectionCard key={idx} user={user} />
           ))}
         </div>

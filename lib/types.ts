@@ -1,4 +1,4 @@
-export interface UserAPI {
+export interface User {
   _id: string
   username: string
   email: string
@@ -6,16 +6,15 @@ export interface UserAPI {
   avatar: string
 }
 
-export interface GroupAPI {
+export interface Group {
   _id: string
   name: string
-  // members: User[]
   members: string[]
   totalMembers: number
   avatar: string
 }
 
-export interface MessageAPI {
+export interface Message {
   _id: string
   senderId: string
   receiverId?: string
@@ -26,6 +25,11 @@ export interface MessageAPI {
     userId: string
     readAt: Date | null
   }[]
+  sender: {
+    _id: string
+    username: string
+    avatar: string
+  }
   createdAt: Date
 }
 
@@ -43,8 +47,8 @@ export interface MessageReadReceipt {
   userId: string
 }
 
-export interface UserGroupAPI {
-  id: string
+export interface UserGroup {
+  _id: string
   username: string
   email: string
   avatar: string
